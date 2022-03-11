@@ -166,4 +166,22 @@ NFT.getNFT = (collectionAddress, tokenId, result) => {
   });
 }
 
+NFT.countNFTs = (collectionAddress) => {
+  return new Promise((resolve, reject) => {
+    let query = `SELECT COUNT(*) FROM nfts WHERE collectionAddress = '${collectionAddress}'`
+    sql.query(query, (err, res) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+  
+      if (res && res.length) {
+        resolve(res[0]);
+      } else {
+        reject(null)
+      }
+    });
+  })
+}
+
 module.exports = NFT

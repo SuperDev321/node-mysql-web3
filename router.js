@@ -19,6 +19,8 @@ router.post('/fetchFromBC', async function (req, res) {
 });
 router.get('/:collectionAddress', getNFT);
 
+router.get('/:collectionAddress/count', getNumOfNFTs);
+
 router.get('/:collectionAddress/:tokenId', getOneNFT);
 
 router.post('/getItems', getMarketplaceNFTs);

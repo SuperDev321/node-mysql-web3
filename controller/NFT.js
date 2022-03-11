@@ -303,11 +303,31 @@ const getMarketplaceNFTs = async (req, res) => {
   }
 }
 
+const getNumOfNFTs = async (req, res) => {
+  try {
+    const { collectionAddress } = req.params
+    const result = await NFT.countNFTs(collectionAddress)
+    console.log(result)
+    if (result && result['COUNT(*)']) {
+      res.status(200).json({
+        result: true,
+        data: result['COUNT(*)']
+      })
+    } else {
+      res.status(400).json({})
+    }
+  } catch (err) {
+    console.log(error)
+    res.status(500).json({})
+  }
+}
+
 
 module.exports = {
   fetchDefaultNFTData,
   fetchNFTData,
   getNFT,
   getOneNFT,
-  getMarketplaceNFTs
+  getMarketplaceNFTs,
+  getNumOfNFTs
 }
