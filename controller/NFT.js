@@ -10,23 +10,43 @@ const {
   getIPFSSufix,
   getTokenURI,
   getAssetType,
-  getImageURI
+  getImageURI,
+  isBurned
 } = require('../utils/common')
 const contractAddress = "0x86c4764a936b0277877cb83abf1ad79ce35c754c"
 
 const web3 = new Web3(new Web3.providers.HttpProvider('https://rpc.ftm.tools/'));
 
-const fetchNFTData = async (_collectionAddress, _totalSupply) => {
+const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
   try {
     const collectionAddress = _collectionAddress.toLowerCase()
     const contract = new web3.eth.Contract(collectionABI, collectionAddress);
     const promises = []
     const createArray = []
-    const total = await contract.methods.totalSupply().call()
-    const totalSupply = 4500
-    for (let id = 4400; id <= totalSupply; id ++) {
+    const deleteArray = []
+    const total = await contract.methods.totalSupply().call().catch(() => 0)
+    const totalSupply = endId ? endId : (total ? total : 100)
+    for (let id = startId; id <= totalSupply; id ++) {
       const promise = (async () => {
         try {
+        const burned = await contract.methods.ownerOf(id).call()
+          .then((result) => {
+            if (result) {
+              if (isBurned(result)) return true
+            }
+            return false
+          })
+          .catch(async (err) => {
+            return false
+          })
+        if (burned) {
+          console.log('burned', collectionAddress, id)
+          deleteArray.push({
+            collectionAddress,
+            tokenId: id
+          })
+          return
+        }
         const token_uri = await contract.methods.tokenURI(id).call()
 
         let uri = token_uri
@@ -140,8 +160,16 @@ const fetchNFTData = async (_collectionAddress, _totalSupply) => {
       promises.push(promise)
     }
     await Promise.all(promises.map((promise) => promise()))
-    if (createArray.length)
+    if (deleteArray.length) {
+      console.log('delete', deleteArray.length)
+      await NFT.deleteMany(deleteArray)
+    }
+    if (createArray.length) {
       await NFT.createMany(createArray)
+      console.log(createArray.length)
+      return createArray.length
+    }
+    
   } catch (err) {
     return null
   }
@@ -181,8 +209,11 @@ const fetchDefaultNFTData = async () => {
     ids.push(id)
   }
   await Promise.all(ids.map((id) => promise(id)))
-  if (createArray.length)
+  if (createArray.length) {
       await NFT.createMany(createArray)
+      return createArray.length
+  }
+    
 }
 
 // rest api

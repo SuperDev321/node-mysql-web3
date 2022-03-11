@@ -74,7 +74,30 @@ NFT.createMany = (newNfts) => {
               assetURI = VALUES(assetURI),
               assetType = VALUES(assetType),
               attributes = VALUES(attributes);`
-    console.log(query)
+    sql.query(query, (err, res) => {
+      if (err) {
+        console.log("error: ", err);
+        reject(err);
+        return;
+      }
+      resolve(true)
+    });
+  })
+};
+NFT.deleteMany = (newNfts) => {
+  return new Promise((resolve, reject) => {
+    let query = 'DELETE FROM nfts WHERE '
+    newNfts.forEach((_element, index) => {
+      const {
+        tokenId,
+        collectionAddress,
+      } = _element
+      if (index < newNfts.length - 1) {
+        query += `(tokenId = '${tokenId}' AND collectionAddress = '${collectionAddress}') OR `
+      } else {
+        query += `(tokenId = '${tokenId}' AND collectionAddress = '${collectionAddress}')`
+      }
+    });
     sql.query(query, (err, res) => {
       if (err) {
         console.log("error: ", err);

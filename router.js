@@ -3,14 +3,19 @@ const { fetchNFTData, getNFT, getMarketplaceNFTs, fetchDefaultNFTData, getOneNFT
 const router = express.Router();
 
 router.post('/fetchFromBC', async function (req, res) {
-  const { collectionAddress, totalSupply } = req.body
-  if (collectionAddress == 'default') {
-    await fetchDefaultNFTData()
-  } else {
-    await fetchNFTData(collectionAddress, totalSupply)
+  try {
+    const { collectionAddress, startId, endId } = req.body
+    let result = null
+    if (collectionAddress == 'default') {
+      result = await fetchDefaultNFTData()
+    } else {
+      result = await fetchNFTData(collectionAddress, startId, endId)
+    }
+    console.log(result)
+    return res.status(200).json({ result });
+  } catch (err) {
+    res.status(500).json({ error: 'unknown_error' });
   }
-  
-   res.send(collectionAddress);
 });
 router.get('/:collectionAddress', getNFT);
 
