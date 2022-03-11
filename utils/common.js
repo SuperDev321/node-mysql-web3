@@ -133,7 +133,6 @@ const getAssetType = (url) => {
         else resolve('other')
       };
       xhr.onerror = function(err) {
-        console.log(err)
         resolve('other')
       }
       xhr.send();
