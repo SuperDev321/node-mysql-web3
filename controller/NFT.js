@@ -54,11 +54,11 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
             return
           }
           let token_uri = ''
-          // try {
+          try {
             token_uri = await contract.methods.tokenURI(id).call()
-          // } catch (err) {
-          //   token_uri = await contract.methods.uri(id).call()
-          // }
+          } catch (err) {
+            token_uri = await contract.methods.uri(id).call()
+          }
           
           let uri = token_uri
           
@@ -200,7 +200,8 @@ const fetch1155NFTData = async (_collectionAddress, startId = 0, endId = 0) => {
     const promises = []
     const createArray = []
     const deleteArray = []
-    const totalSupply = endId ? endId : 100
+    const total = await contract.methods.totalSupply().call().catch(() => 0)
+    const totalSupply = endId ? endId : (total ? total : 100)
     for (let id = startId; id <= totalSupply; id ++) {
       const promise = (async () => {
         try {
