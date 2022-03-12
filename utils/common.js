@@ -155,7 +155,8 @@ const countTraitValue = (nfts, traitType, traitValue) => {
     const traitCount = nfts.filter((nft) => {
       const { attributes } = nft
       if (!attributes) return false
-      const jsonAttributes = JSON.parse(attributes)
+      let jsonAttributes = attributes
+      if (typeof attributes === 'object') jsonAttributes = JSON.parse(attributes)
       return jsonAttributes.find(({ trait_type, value }) => (value === traitValue && trait_type === traitType))
     }).length
     return traitCount
