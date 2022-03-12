@@ -25,5 +25,7 @@ router.get('/:collectionAddress/:tokenId', getOneNFT);
 
 router.post('/getItems', getMarketplaceNFTs);
 
+router.post('/calculateRarity', calculateRarity);
+
 //export this router to use in our index.js
 module.exports = router;

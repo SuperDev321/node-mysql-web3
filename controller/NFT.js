@@ -495,6 +495,95 @@ const getNumOfNFTs = async (req, res) => {
   }
 }
 
+const calculateRarity = async (req, res) => {
+  try {
+    const { collectionAddress: _collectionAddress } = req.body
+    
+    const collectionAddress = _collectionAddress.toLowerCase()
+    NFT.getCollectionNFT(collectionAddress, 0, 0, (result, data) => {
+      if (result && data.length) {
+        const traitTotalCounts = []
+        const totalLength = data.length
+        let dataToUpdate = data.map((nftItem) => {
+          const { attributes, tokenId } = nftItem
+          let score = 0
+          if (attributes) {
+            const jsonAttributes = JSON.parse(attributes)
+            if (jsonAttributes) {
+              jsonAttributes.forEach(attribute => {
+                const { trait_type, value } = attribute
+                let totalCount = 0
+                const totalTraitItem = traitTotalCounts.find((item) => (item.trait_type === trait_type && item.value === value))
+                if (!totalTraitItem) {
+                  totalCount = countTraitValue(data, trait_type, value)
+                  console.log(totalCount)
+                  traitTotalCounts.push({
+                    trait_type,
+                    value,
+                    count: totalCount
+                  })
+                } else {
+                  totalCount = totalTraitItem.count
+                }
+                if (totalCount) score += totalLength / totalCount
+              });
+              return {
+                collectionAddress,
+                tokenId,
+                rarityScore: score
+              }
+            }
+          }
+          return {
+            collectionAddress,
+            tokenId,
+            rarityScore: 0
+          }
+        })
+        if (dataToUpdate && dataToUpdate.length) {
+          dataToUpdate.sort(function(a, b) {
+            if (a.rarityScore && b.rarityScore) {
+              if (a.rarityScore > b.rarityScore) return -1
+              else if (a.rarityScore < b.rarityScore) return 1
+              else return 0
+            } else  if (a.rarityScore) {
+              return -1
+            } else if (b.rarityScore) {
+              return 1
+            } else {
+              return 0
+            }
+          })
+          dataToUpdate = dataToUpdate.map((item, index) => ({ ...item, rarityRank : index + 1}))
+          
+          NFT.updateRarity(dataToUpdate)
+        }
+
+        res
+        .status(200)
+        .json({
+          result: true,
+          data: dataToUpdate
+        })
+      } else {
+        res
+        .status(500)
+        .json({
+          result: false,
+          data
+        })
+      }
+    })
+  } catch (err) {
+    console.log(err)
+    res
+      .status(400)
+      .json({
+        result: false,
+      })
+  }
+}
+
 
 module.exports = {
   fetchDefaultNFTData,
@@ -503,5 +592,6 @@ module.exports = {
   getNFT,
   getOneNFT,
   getMarketplaceNFTs,
-  getNumOfNFTs
+  getNumOfNFTs,
+  calculateRarity
 }
