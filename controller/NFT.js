@@ -17,7 +17,7 @@ const contractAddress = "0x86c4764a936b0277877cb83abf1ad79ce35c754c"
 
 const web3 = new Web3(new Web3.providers.HttpProvider('https://rpc.ftm.tools/'));
 
-const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
+const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collectionName = '', replacement = false, replacementPrefix = null, replacementSubfix = '') => {
   try {
     const contract = new web3.eth.Contract(collectionABI, _collectionAddress);
     const isERC1155 = await contract.methods.supportsInterface('0x2a55205a').call().catch(() => false)
@@ -74,7 +74,6 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
           }
           
           if (!isIpfs(uri) || isBase64(uri)) {
-            console.log('base uri')
             tokenURI = uri
           } else if (ipfsSufix === 'url') {
             const p = token_uri.indexOf('?')
@@ -138,31 +137,37 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
           let description = ''
           let jsonAttributes = null
 
-          if (isImage) {
-            assetURI = getImageURI(tokenURI)
+          if (replacement && replacementPrefix) {
+            assetURI = '/img/replacements/' + replacementPrefix + id + replacementSubfix;
             assetType = await getAssetType(assetURI)
-            title = ("00" + id).slice(-3);
-          } else if (metadata) {
-            title = metadata.name
-            description = metadata.description
-            let attributes = metadata.attributes
-  
-            jsonAttributes = attributes && JSON.stringify(attributes)
-  
-            if (title) title = title.replace(/\'/g, "\\'")
-            else title = ''
-            if (description) description = description.replace(/\'/g, "\\'")
-            else description = ''
-            if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
-            if (metadata.image) {
-              assetURI = getImageURI(metadata.image)
+            console.log('replacement', assetURI, assetType)
+          } else {
+            if (isImage) {
+              assetURI = getImageURI(tokenURI)
               assetType = await getAssetType(assetURI)
-            } else if (metadata.animation_url){
-              assetURI = getImageURI(metadata.animation_url)
-              assetType = await getAssetType(assetURI)
-            } else {
-              assetURI = ''
-              assetType = 'other'
+              title = collectionName + ' ' ("00" + id).slice(-3);
+            } else if (metadata) {
+              title = metadata.name ? metadata.name : null
+              description = metadata.description ? metadata.description : null
+              let attributes = metadata.attributes ? metadata.attributes : null
+    
+              jsonAttributes = attributes && JSON.stringify(attributes)
+    
+              if (title) title = title.replace(/\'/g, "\\'")
+              else title = ''
+              if (description) description = description.replace(/\'/g, "\\'")
+              else description = ''
+              if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
+              if (metadata.image) {
+                assetURI = getImageURI(metadata.image)
+                assetType = await getAssetType(assetURI)
+              } else if (metadata.animation_url){
+                assetURI = getImageURI(metadata.animation_url)
+                assetType = await getAssetType(assetURI)
+              } else {
+                assetURI = ''
+                assetType = 'other'
+              }
             }
           }
           createArray.push({collectionAddress,
