@@ -1,5 +1,5 @@
 const express = require('express');
-const { fetchNFTData, getNFT, getMarketplaceNFTs, fetchDefaultNFTData, getOneNFT, getNumOfNFTs } = require('./controller/NFT');
+const { fetchNFTData, getNFT, getMarketplaceNFTs, fetchDefaultNFTData, getOneNFT, getNumOfNFTs, calculateRarity } = require('./controller/NFT');
 const router = express.Router();
 
 router.post('/fetchFromBC', async function (req, res) {
