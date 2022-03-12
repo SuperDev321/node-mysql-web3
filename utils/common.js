@@ -24,10 +24,16 @@ const isBurned = (address) => {
 function isBase64(str) {
   if (str ==='' || str.trim() ===''){ return false; }
   try {
-      return btoa(atob(str)) === str;
+      return Buffer.from(str, 'base64').toString('base64') === str
   } catch (err) {
       return false;
   }
+}
+
+const base64Re = new RegExp(/^data:\w+\/\w+;base64,/);
+
+function isBase64URI(uri) {
+  return base64Re.test(uri)
 }
 
 const getImageURI = (uri) => {
@@ -106,6 +112,7 @@ const getTokenURI = (id, ipfsPrefix, ipfsSufix, involveId, locationQm) => {
 
 const getAssetType = (url) => {
   if (url) {
+    if (isBase64URI(url)) return 'base64'
     let uri = url
     const p = uri.indexOf('?')
     if (p !== -1) {
@@ -113,6 +120,7 @@ const getAssetType = (url) => {
       if (!subStr.includes('?index='))
         uri = uri.slice(0, p)
     }
+    
     if(uri.indexOf(".mp4") !== -1) return "video";
     if(uri.indexOf(".m4v") !== -1) return "video";
     if(uri.indexOf(".avi") !== -1) return "video";
@@ -125,7 +133,7 @@ const getAssetType = (url) => {
     if(uri.indexOf(".glb") !== -1) return "glb";
     return new Promise((resolve, reject) => {
       var xhr = new XMLHttpRequest();
-      xhr.open('HEAD', uri, true);
+      xhr.open('HEAD', b.toString('base64'), true);
       xhr.onload = function() {
         var contentType = xhr.getResponseHeader('Content-Type');
         if (contentType.match('video.*')) resolve('video')

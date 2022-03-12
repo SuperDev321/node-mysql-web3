@@ -29,75 +29,74 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
     for (let id = startId; id <= totalSupply; id ++) {
       const promise = (async () => {
         try {
-        const burned = await contract.methods.ownerOf(id).call()
-          .then((result) => {
-            if (result) {
-              if (isBurned(result)) return true
-            }
-            return false
-          })
-          .catch(async (err) => {
-            return false
-          })
-        if (burned) {
-          console.log('burned', collectionAddress, id)
-          deleteArray.push({
-            collectionAddress,
-            tokenId: id
-          })
-          return
-        }
-        const token_uri = await contract.methods.tokenURI(id).call()
-
-        let uri = token_uri
-        
-        let tokenURI = ''
-        let metadata = null
-        let isImage = false
-        const ipfsSufix = getIPFSSufix(uri);
-        let p = uri.indexOf('?')
-        if (p !== -1) {
-          const subStr = uri.slice(p, uri.length)
-          if (!subStr.includes('?index='))
-            uri = uri.slice(0, p)
-        }
-        if (!isIpfs(uri) || isBase64(uri)) {
-          tokenURI = uri
-        } else if (ipfsSufix === 'url') {
-          const p = token_uri.indexOf('?')
-          if (p !== -1) uri = token_uri.slice(0, p)
-          if (uri.includes('Qm') ) {
-            let p = uri.indexOf("Qm");
-            let locationQm = ""
-            if (p !== -1) locationQm = uri.substring(p)
-            tokenURI = 'https://operahouse.mypinata.cloud/ipfs/' + locationQm
-          } else {
+          const burned = await contract.methods.ownerOf(id).call()
+            .then((result) => {
+              if (result) {
+                if (isBurned(result)) return true
+              }
+              return false
+            })
+            .catch(async (err) => {
+              return false
+            })
+          if (burned) {
+            console.log('burned', collectionAddress, id)
+            deleteArray.push({
+              collectionAddress,
+              tokenId: id
+            })
+            return
+          }
+          const token_uri = await contract.methods.tokenURI(id).call()
+          
+          let uri = token_uri
+          
+          let tokenURI = ''
+          let metadata = null
+          let isImage = false
+          const ipfsSufix = getIPFSSufix(uri);
+          let p = uri.indexOf('?')
+          if (p !== -1) {
+            const subStr = uri.slice(p, uri.length)
+            if (!subStr.includes('?index='))
+              uri = uri.slice(0, p)
+          }
+          
+          if (!isIpfs(uri) || isBase64(uri)) {
+            console.log('base uri')
             tokenURI = uri
+          } else if (ipfsSufix === 'url') {
+            const p = token_uri.indexOf('?')
+            if (p !== -1) uri = token_uri.slice(0, p)
+            if (uri.includes('Qm') ) {
+              let p = uri.indexOf("Qm");
+              let locationQm = ""
+              if (p !== -1) locationQm = uri.substring(p)
+              tokenURI = 'https://operahouse.mypinata.cloud/ipfs/' + locationQm
+            } else {
+              tokenURI = uri
+            }
+          } else {
+            let p = token_uri.indexOf('?')
+            if (p !== -1) uri = token_uri.slice(0, p)
+            let involveId = isIdInURI(uri);
+            let ipfsPos = uri.lastIndexOf('/ipfs/')
+            let subUri = uri.substring(ipfsPos + 6)
+            while (subUri && subUri.length > 0) {
+              const firstCharacter = subUri[0]
+              if (!firstCharacter.match(/[a-z]/i)) subUri = subUri.substring(1)
+              else break
+            }
+            tokenURI = getTokenURI(id, '', ipfsSufix, involveId, subUri);
           }
-        } else {
-          let p = token_uri.indexOf('?')
-          if (p !== -1) uri = token_uri.slice(0, p)
-          let involveId = isIdInURI(uri);
-          let ipfsPos = uri.lastIndexOf('/ipfs/')
-          let subUri = uri.substring(ipfsPos + 6)
-          while (subUri && subUri.length > 0) {
-            const firstCharacter = subUri[0]
-            if (!firstCharacter.match(/[a-z]/i)) subUri = subUri.substring(1)
-            else break
-          }
-          tokenURI = getTokenURI(id, '', ipfsSufix, involveId, subUri);
-        }
-        const tokenAssetType = await getAssetType(tokenURI)
+          const tokenAssetType = await getAssetType(tokenURI)
 
-        if (tokenAssetType === 'other') {
-          try {
-            let response = await fetch(tokenURI);
-            const responseText = await response.text()
-            const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
-            const correct = responseText.replace(regex, '');
-            metadata = JSON.parse(correct)
-          } catch (err) {
-            await sleep(100)
+          if (tokenAssetType === 'base64') {
+            const base64Code = tokenURI.replace(/^data:\w+\/\w+;base64,/, '')
+            let buff = new Buffer(base64Code, 'base64');
+            let text = buff.toString('ascii');
+            metadata = JSON.parse(text)
+          } else if (tokenAssetType === 'other') {
             try {
               let response = await fetch(tokenURI);
               const responseText = await response.text()
@@ -105,44 +104,54 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
               const correct = responseText.replace(regex, '');
               metadata = JSON.parse(correct)
             } catch (err) {
-              return null
+              await sleep(100)
+              try {
+                let response = await fetch(base64URL);
+                const responseText = await response.text()
+                const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
+                const correct = responseText.replace(regex, '');
+                metadata = JSON.parse(correct)
+              } catch (err) {
+                console.log(err)
+                return null
+              }
             }
+          } else {
+            isImage = true
           }
-        } else {
-          isImage = true
-        }
+          console.log(metadata)
 
-        let {
-          name: title,
-          description,
-          attributes
-        } = metadata
+          let {
+            name: title,
+            description,
+            attributes
+          } = metadata
 
-        let assetURI = ''
-        let assetType = ''
+          let assetURI = ''
+          let assetType = ''
 
-        let jsonAttributes = attributes ? JSON.stringify(attributes): null
+          let jsonAttributes = attributes ? JSON.stringify(attributes): null
 
-        if (title) title = title.replace(/\'/g, "\\'")
-        else title = ''
-        if (description) description = description.replace(/\'/g, "\\'")
-        else description = ''
-        if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
+          if (title) title = title.replace(/\'/g, "\\'")
+          else title = ''
+          if (description) description = description.replace(/\'/g, "\\'")
+          else description = ''
+          if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
 
-        if (isImage) {
-          assetURI = getImageURI(tokenURI)
-          assetType = await getAssetType(assetURI)
-          title = collectionInfo.name + ' ' + ("00" + id).slice(-3);
-        } else if (metadata.image) {
-          assetURI = getImageURI(metadata.image)
-          assetType = await getAssetType(assetURI)
-        } else if (metadata.animation_url){
-          assetURI = getImageURI(metadata.animation_url)
-          assetType = await getAssetType(assetURI)
-        } else {
-          assetURI = ''
-          assetType = 'other'
-        }
+          if (isImage) {
+            assetURI = getImageURI(tokenURI)
+            assetType = await getAssetType(assetURI)
+            title = collectionInfo.name + ' ' + ("00" + id).slice(-3);
+          } else if (metadata.image) {
+            assetURI = getImageURI(metadata.image)
+            assetType = await getAssetType(assetURI)
+          } else if (metadata.animation_url){
+            assetURI = getImageURI(metadata.animation_url)
+            assetType = await getAssetType(assetURI)
+          } else {
+            assetURI = ''
+            assetType = 'other'
+          }
           createArray.push({collectionAddress,
             tokenId: id, 
             assetURI,
@@ -161,14 +170,12 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
     }
     await Promise.all(promises.map((promise) => promise()))
     if (deleteArray.length) {
-      console.log('delete', deleteArray.length)
       await NFT.deleteMany(deleteArray)
     }
     if (createArray.length) {
       await NFT.createMany(createArray)
-      console.log(createArray.length)
-      return createArray.length
     }
+    return deleteArray.length + createArray.length
     
   } catch (err) {
     return null
