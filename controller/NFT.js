@@ -202,8 +202,7 @@ const fetch1155NFTData = async (_collectionAddress, startId = 0, endId = 0) => {
     const promises = []
     const createArray = []
     const deleteArray = []
-    const total = await contract.methods.totalSupply().call().catch(() => 0)
-    const totalSupply = endId ? endId : (total ? total : 100)
+    const totalSupply = endId ? endId : 100
     for (let id = startId; id <= totalSupply; id ++) {
       const promise = (async () => {
         try {
