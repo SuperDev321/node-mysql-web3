@@ -117,7 +117,7 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
             } catch (err) {
               await sleep(100)
               try {
-                let response = await fetch(base64URL);
+                let response = await fetch(tokenURI);
                 const responseText = await response.text()
                 const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
                 const correct = responseText.replace(regex, '');
@@ -130,38 +130,40 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
           } else {
             isImage = true
           }
-          console.log(metadata)
-
-          let {
-            name: title,
-            description,
-            attributes
-          } = metadata
+          console.log(metadata, tokenURI)
 
           let assetURI = ''
           let assetType = ''
-
-          let jsonAttributes = attributes ? JSON.stringify(attributes): null
-
-          if (title) title = title.replace(/\'/g, "\\'")
-          else title = ''
-          if (description) description = description.replace(/\'/g, "\\'")
-          else description = ''
-          if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
+          let title = ''
+          let description = ''
+          let jsonAttributes = null
 
           if (isImage) {
             assetURI = getImageURI(tokenURI)
             assetType = await getAssetType(assetURI)
-            title = collectionInfo.name + ' ' + ("00" + id).slice(-3);
-          } else if (metadata.image) {
-            assetURI = getImageURI(metadata.image)
-            assetType = await getAssetType(assetURI)
-          } else if (metadata.animation_url){
-            assetURI = getImageURI(metadata.animation_url)
-            assetType = await getAssetType(assetURI)
-          } else {
-            assetURI = ''
-            assetType = 'other'
+            title = ("00" + id).slice(-3);
+          } else if (metadata) {
+            title = metadata.name
+            description = metadata.description
+            let attributes = metadata.attributes
+  
+            jsonAttributes = attributes && JSON.stringify(attributes)
+  
+            if (title) title = title.replace(/\'/g, "\\'")
+            else title = ''
+            if (description) description = description.replace(/\'/g, "\\'")
+            else description = ''
+            if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
+            if (metadata.image) {
+              assetURI = getImageURI(metadata.image)
+              assetType = await getAssetType(assetURI)
+            } else if (metadata.animation_url){
+              assetURI = getImageURI(metadata.animation_url)
+              assetType = await getAssetType(assetURI)
+            } else {
+              assetURI = ''
+              assetType = 'other'
+            }
           }
           createArray.push({collectionAddress,
             tokenId: id, 
