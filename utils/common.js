@@ -149,6 +149,21 @@ const getAssetType = (url) => {
   }
 }
 
+const countTraitValue = (nfts, traitType, traitValue) => {
+  console.log('count trait', traitType, traitValue)
+  try {
+    const traitCount = nfts.filter((nft) => {
+      const { attributes } = nft
+      if (!attributes) return false
+      const jsonAttributes = JSON.parse(attributes)
+      return jsonAttributes.find(({ trait_type, value }) => (value === traitValue && trait_type === traitType))
+    }).length
+    return traitCount
+  } catch {
+    return 0
+  }
+}
+
 module.exports = {
   isBase64,
   isIpfs,
@@ -158,5 +173,6 @@ module.exports = {
   isBurned,
   isIdInURI,
   getIPFSSufix,
-  sleep
+  sleep,
+  countTraitValue
 }

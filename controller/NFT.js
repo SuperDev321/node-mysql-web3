@@ -11,7 +11,8 @@ const {
   getTokenURI,
   getAssetType,
   getImageURI,
-  isBurned
+  isBurned,
+  countTraitValue
 } = require('../utils/common')
 const contractAddress = "0x86c4764a936b0277877cb83abf1ad79ce35c754c"
 
