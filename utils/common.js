@@ -160,7 +160,8 @@ const countTraitValue = (nfts, traitType, traitValue) => {
       return jsonAttributes.find(({ trait_type, value }) => (value === traitValue && trait_type === traitType))
     }).length
     return traitCount
-  } catch {
+  } catch (err) {
+    console.log(err)
     return 0
   }
 }
