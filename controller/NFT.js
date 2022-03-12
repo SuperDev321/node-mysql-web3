@@ -23,7 +23,7 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
     const isERC1155 = await contract.methods.supportsInterface('0x2a55205a').call().catch(() => false)
     console.log(isERC1155)
     if (isERC1155) {
-      const result = await fetch1155NFTData(_collectionAddress, startId = 0, endId = 0)
+      const result = await fetch1155NFTData(_collectionAddress, startId, endId)
       return result
     }
     const collectionAddress = _collectionAddress.toLowerCase()
