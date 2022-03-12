@@ -1,6 +1,6 @@
 const Web3 = require('web3')
 const fetch = require('node-fetch')
-const { collectionABI, NFTContractABI } = require('../constant/abi')
+const { collectionABI, NFTContractABI, ERC1155ABI } = require('../constant/abi')
 const NFT = require('../model/nft.model')
 const {
   sleep,
@@ -19,8 +19,14 @@ const web3 = new Web3(new Web3.providers.HttpProvider('https://rpc.ftm.tools/'))
 
 const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
   try {
+    const contract = new web3.eth.Contract(collectionABI, _collectionAddress);
+    const isERC1155 = await contract.methods.supportsInterface('0x2a55205a').call().catch(() => false)
+    console.log(isERC1155)
+    if (isERC1155) {
+      const result = await fetch1155NFTData(_collectionAddress, startId = 0, endId = 0)
+      return result
+    }
     const collectionAddress = _collectionAddress.toLowerCase()
-    const contract = new web3.eth.Contract(collectionABI, collectionAddress);
     const promises = []
     const createArray = []
     const deleteArray = []
@@ -47,7 +53,159 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0) => {
             })
             return
           }
-          const token_uri = await contract.methods.tokenURI(id).call()
+          let token_uri = ''
+          // try {
+            token_uri = await contract.methods.tokenURI(id).call()
+          // } catch (err) {
+          //   token_uri = await contract.methods.uri(id).call()
+          // }
+          
+          let uri = token_uri
+          
+          let tokenURI = ''
+          let metadata = null
+          let isImage = false
+          const ipfsSufix = getIPFSSufix(uri);
+          let p = uri.indexOf('?')
+          if (p !== -1) {
+            const subStr = uri.slice(p, uri.length)
+            if (!subStr.includes('?index='))
+              uri = uri.slice(0, p)
+          }
+          
+          if (!isIpfs(uri) || isBase64(uri)) {
+            console.log('base uri')
+            tokenURI = uri
+          } else if (ipfsSufix === 'url') {
+            const p = token_uri.indexOf('?')
+            if (p !== -1) uri = token_uri.slice(0, p)
+            if (uri.includes('Qm') ) {
+              let p = uri.indexOf("Qm");
+              let locationQm = ""
+              if (p !== -1) locationQm = uri.substring(p)
+              tokenURI = 'https://operahouse.mypinata.cloud/ipfs/' + locationQm
+            } else {
+              tokenURI = uri
+            }
+          } else {
+            let p = token_uri.indexOf('?')
+            if (p !== -1) uri = token_uri.slice(0, p)
+            let involveId = isIdInURI(uri);
+            let ipfsPos = uri.lastIndexOf('/ipfs/')
+            let subUri = uri.substring(ipfsPos + 6)
+            while (subUri && subUri.length > 0) {
+              const firstCharacter = subUri[0]
+              if (!firstCharacter.match(/[a-z]/i)) subUri = subUri.substring(1)
+              else break
+            }
+            tokenURI = getTokenURI(id, '', ipfsSufix, involveId, subUri);
+          }
+          const tokenAssetType = await getAssetType(tokenURI)
+
+          if (tokenAssetType === 'base64') {
+            const base64Code = tokenURI.replace(/^data:\w+\/\w+;base64,/, '')
+            let buff = new Buffer(base64Code, 'base64');
+            let text = buff.toString('ascii');
+            metadata = JSON.parse(text)
+          } else if (tokenAssetType === 'other') {
+            try {
+              let response = await fetch(tokenURI);
+              const responseText = await response.text()
+              const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
+              const correct = responseText.replace(regex, '');
+              metadata = JSON.parse(correct)
+            } catch (err) {
+              await sleep(100)
+              try {
+                let response = await fetch(base64URL);
+                const responseText = await response.text()
+                const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
+                const correct = responseText.replace(regex, '');
+                metadata = JSON.parse(correct)
+              } catch (err) {
+                console.log(err)
+                return null
+              }
+            }
+          } else {
+            isImage = true
+          }
+          console.log(metadata)
+
+          let {
+            name: title,
+            description,
+            attributes
+          } = metadata
+
+          let assetURI = ''
+          let assetType = ''
+
+          let jsonAttributes = attributes ? JSON.stringify(attributes): null
+
+          if (title) title = title.replace(/\'/g, "\\'")
+          else title = ''
+          if (description) description = description.replace(/\'/g, "\\'")
+          else description = ''
+          if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
+
+          if (isImage) {
+            assetURI = getImageURI(tokenURI)
+            assetType = await getAssetType(assetURI)
+            title = collectionInfo.name + ' ' + ("00" + id).slice(-3);
+          } else if (metadata.image) {
+            assetURI = getImageURI(metadata.image)
+            assetType = await getAssetType(assetURI)
+          } else if (metadata.animation_url){
+            assetURI = getImageURI(metadata.animation_url)
+            assetType = await getAssetType(assetURI)
+          } else {
+            assetURI = ''
+            assetType = 'other'
+          }
+          createArray.push({collectionAddress,
+            tokenId: id, 
+            assetURI,
+            assetType,
+            title,
+            description,
+            attributes: jsonAttributes
+          })
+        // }
+        } catch (err) {
+          console.log('error1',err)
+          return null
+        }
+      })
+      promises.push(promise)
+    }
+    await Promise.all(promises.map((promise) => promise()))
+    if (deleteArray.length) {
+      await NFT.deleteMany(deleteArray)
+    }
+    if (createArray.length) {
+      await NFT.createMany(createArray)
+    }
+    return deleteArray.length + createArray.length
+    
+  } catch (err) {
+    return null
+  }
+}
+
+const fetch1155NFTData = async (_collectionAddress, startId = 0, endId = 0) => {
+  try {
+    const collectionAddress = _collectionAddress.toLowerCase()
+    const contract = new web3.eth.Contract(ERC1155ABI, collectionAddress);
+    const promises = []
+    const createArray = []
+    const deleteArray = []
+    const totalSupply = endId ? endId : 100
+    for (let id = startId; id <= totalSupply; id ++) {
+      const promise = (async () => {
+        try {
+          let token_uri = ''
+          token_uri = await contract.methods.uri(id).call()
           
           let uri = token_uri
           
@@ -314,7 +472,6 @@ const getNumOfNFTs = async (req, res) => {
   try {
     const { collectionAddress } = req.params
     const result = await NFT.countNFTs(collectionAddress)
-    console.log(result)
     if (result && result['COUNT(*)']) {
       res.status(200).json({
         result: true,
@@ -333,6 +490,7 @@ const getNumOfNFTs = async (req, res) => {
 module.exports = {
   fetchDefaultNFTData,
   fetchNFTData,
+  fetch1155NFTData,
   getNFT,
   getOneNFT,
   getMarketplaceNFTs,
