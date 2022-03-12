@@ -120,7 +120,6 @@ const getAssetType = (url) => {
       if (!subStr.includes('?index='))
         uri = uri.slice(0, p)
     }
-    
     if(uri.indexOf(".mp4") !== -1) return "video";
     if(uri.indexOf(".m4v") !== -1) return "video";
     if(uri.indexOf(".avi") !== -1) return "video";
@@ -133,7 +132,7 @@ const getAssetType = (url) => {
     if(uri.indexOf(".glb") !== -1) return "glb";
     return new Promise((resolve, reject) => {
       var xhr = new XMLHttpRequest();
-      xhr.open('HEAD', b.toString('base64'), true);
+      xhr.open('HEAD', url, true);
       xhr.onload = function() {
         var contentType = xhr.getResponseHeader('Content-Type');
         if (contentType.match('video.*')) resolve('video')
