@@ -508,8 +508,10 @@ const calculateRarity = async (req, res) => {
           const { attributes, tokenId } = nftItem
           let score = 0
           if (attributes) {
-            console.log(typeof attributes)
-            const jsonAttributes = JSON.parse(attributes)
+            jsonAttributes = attributes
+            if (typeof attributes !== 'object') {
+              jsonAttributes = JSON.parse(attributes)
+            }
             if (jsonAttributes) {
               jsonAttributes.forEach(attribute => {
                 const { trait_type, value } = attribute
