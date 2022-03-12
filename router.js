@@ -4,12 +4,12 @@ const router = express.Router();
 
 router.post('/fetchFromBC', async function (req, res) {
   try {
-    const { collectionAddress, startId, endId, replacement, replacementPrefix, replacementSubfix, collectionName } = req.body
+    const { collectionAddress, startId, endId, replacement, replacementPrefix, replacementSubfix, collectionName, ipfsUri } = req.body
     let result = null
     if (collectionAddress == 'default') {
       result = await fetchDefaultNFTData()
     } else {
-      result = await fetchNFTData(collectionAddress, startId, endId, collectionName, replacement, replacementPrefix, replacementSubfix)
+      result = await fetchNFTData(collectionAddress, startId, endId, collectionName, ipfsUri, replacement, replacementPrefix, replacementSubfix)
     }
     console.log(result)
     return res.status(200).json({ result: true, data: result });

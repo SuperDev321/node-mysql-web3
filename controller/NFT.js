@@ -17,11 +17,10 @@ const contractAddress = "0x86c4764a936b0277877cb83abf1ad79ce35c754c"
 
 const web3 = new Web3(new Web3.providers.HttpProvider('https://rpc.ftm.tools/'));
 
-const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collectionName = '', replacement = false, replacementPrefix = null, replacementSubfix = '') => {
+const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collectionName = '', ipfsUri = null, replacement = false, replacementPrefix = null, replacementSubfix = '') => {
   try {
     const contract = new web3.eth.Contract(collectionABI, _collectionAddress);
     const isERC1155 = await contract.methods.supportsInterface('0x2a55205a').call().catch(() => false)
-    console.log(isERC1155)
     if (isERC1155) {
       const result = await fetch1155NFTData(_collectionAddress, startId, endId)
       return result
@@ -54,11 +53,11 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
             return
           }
           let token_uri = ''
-          try {
+          // try {
             token_uri = await contract.methods.tokenURI(id).call()
-          } catch (err) {
-            token_uri = await contract.methods.uri(id).call()
-          }
+          // } catch (err) {
+          //   token_uri = await contract.methods.uri(id).call()
+          // }
           
           let uri = token_uri
           
@@ -73,7 +72,10 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
               uri = uri.slice(0, p)
           }
           
-          if (!isIpfs(uri) || isBase64(uri)) {
+          if (ipfsUri && ipfsSufix === 'json') {
+            tokenURI = ipfsUri + '/' + id + '.json'
+          } else if (!isIpfs(uri) || isBase64(uri)) {
+            console.log('base uri')
             tokenURI = uri
           } else if (ipfsSufix === 'url') {
             const p = token_uri.indexOf('?')
@@ -140,7 +142,7 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
           if (replacement && replacementPrefix) {
             assetURI = '/img/replacements/' + replacementPrefix + id + replacementSubfix;
             assetType = await getAssetType(assetURI)
-            console.log('replacement', assetURI, assetType)
+            console.log('ok', assetURI, assetType)
           } else {
             if (isImage) {
               assetURI = getImageURI(tokenURI)
