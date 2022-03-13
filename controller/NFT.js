@@ -61,6 +61,10 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
           try {
             token_uri = await contract.methods.tokenURI(id).call()
           } catch (err) {
+            if (err && err.message && err.message.includes('nonexistent token')) {
+              console.log('burned')
+              return
+            }
             token_uri = await contract.methods.uri(id).call()
           }
           
@@ -76,13 +80,12 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
             if (!subStr.includes('?index='))
               uri = uri.slice(0, p)
           }
-          
           if (ipfsUri && ipfsSufix === 'json') {
             tokenURI = ipfsUri + '/' + id + '.json'
           } else if (!isIpfs(uri) || isBase64(uri)) {
-            console.log('base uri')
             tokenURI = uri
           } else if (ipfsSufix === 'url') {
+            
             const p = token_uri.indexOf('?')
             if (p !== -1) uri = token_uri.slice(0, p)
             if (uri.includes('Qm') ) {
@@ -90,6 +93,18 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
               let locationQm = ""
               if (p !== -1) locationQm = uri.substring(p)
               tokenURI = 'https://operahouse.mypinata.cloud/ipfs/' + locationQm
+            } else if (isIpfs(uri)) {
+              let p = token_uri.indexOf('?')
+              if (p !== -1) uri = token_uri.slice(0, p)
+              let involveId = isIdInURI(uri);
+              let ipfsPos = uri.lastIndexOf('/ipfs/')
+              let subUri = uri.substring(ipfsPos + 6)
+              while (subUri && subUri.length > 0) {
+                const firstCharacter = subUri[0]
+                if (!firstCharacter.match(/[a-z]/i)) subUri = subUri.substring(1)
+                else break
+              }
+              tokenURI = getTokenURI(id, '', ipfsSufix, involveId, subUri);
             } else {
               tokenURI = uri
             }
@@ -136,7 +151,6 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
           } else {
             isImage = true
           }
-          console.log(metadata, tokenURI)
 
           let assetURI = ''
           let assetType = ''
