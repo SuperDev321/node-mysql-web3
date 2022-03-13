@@ -58,14 +58,15 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
             return
           }
           let token_uri = ''
+          const _tokenId = await contract.methods.tokenByIndex(id).call().catch(() => id)
           try {
-            token_uri = await contract.methods.tokenURI(id).call()
+            token_uri = await contract.methods.tokenURI(_tokenId).call()
           } catch (err) {
             if (err && err.message && err.message.includes('nonexistent token')) {
               console.log('not exist', collectionAddress, id)
               return
             }
-            token_uri = await contract.methods.uri(id).call()
+            token_uri = await contract.methods.uri(_tokenId).call()
           }
           
           let uri = token_uri
