@@ -21,11 +21,15 @@ const web3 = new Web3(new Web3.providers.HttpProvider('https://rpc.ftm.tools/'))
 const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collectionName = '', ipfsUri = null, replacement = false, replacementPrefix = null, replacementSubfix = '') => {
   try {
     const contract = new web3.eth.Contract(collectionABI, _collectionAddress);
-    const isERC1155 = await contract.methods.supportsInterface('0x2a55205a').call().catch(() => false)
-    if (isERC1155) {
-      const result = await fetch1155NFTData(_collectionAddress, startId, endId)
-      return result
-    }
+    // try {
+    //   const isERC1155 = await contract.methods.supportsInterface('0x2a55205a').call().catch(() => false)
+    //   if (isERC1155) {
+    //     const result = await fetch1155NFTData(_collectionAddress, startId, endId)
+    //     return result
+    //   }
+    // } catch (err) {
+      
+    // }
     const collectionAddress = _collectionAddress.toLowerCase()
     const promises = []
     const createArray = []
@@ -54,11 +58,11 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
             return
           }
           let token_uri = ''
-          // try {
+          try {
             token_uri = await contract.methods.tokenURI(id).call()
-          // } catch (err) {
-          //   token_uri = await contract.methods.uri(id).call()
-          // }
+          } catch (err) {
+            token_uri = await contract.methods.uri(id).call()
+          }
           
           let uri = token_uri
           
@@ -206,7 +210,9 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
 const fetch1155NFTData = async (_collectionAddress, startId = 0, endId = 0) => {
   try {
     const collectionAddress = _collectionAddress.toLowerCase()
+    
     const contract = new web3.eth.Contract(ERC1155ABI, collectionAddress);
+    
     const promises = []
     const createArray = []
     const deleteArray = []
@@ -215,8 +221,8 @@ const fetch1155NFTData = async (_collectionAddress, startId = 0, endId = 0) => {
       const promise = (async () => {
         try {
           let token_uri = ''
-          token_uri = await contract.methods.uri(id).call()
           
+          token_uri = await contract.methods.uri(id).call()
           let uri = token_uri
           
           let tokenURI = ''
@@ -230,7 +236,9 @@ const fetch1155NFTData = async (_collectionAddress, startId = 0, endId = 0) => {
               uri = uri.slice(0, p)
           }
           
-          if (!isIpfs(uri) || isBase64(uri)) {
+          if (ipfsUri && ipfsSufix === 'json') {
+            tokenURI = ipfsUri + '/' + id + '.json'
+          } else if (!isIpfs(uri) || isBase64(uri)) {
             console.log('base uri')
             tokenURI = uri
           } else if (ipfsSufix === 'url') {
@@ -558,7 +566,7 @@ const calculateRarity = async (req, res) => {
               return 0
             }
           })
-          dataToUpdate = dataToUpdate.map((item, index) => ({ ...item, rarityRank : index + 1}))
+          dataToUpdate = dataToUpdate.map((item, index) => ({ ...item, rarityRank : item.rarityRank ? index + 1 : 0}))
           
           NFT.updateRarity(dataToUpdate)
         }
