@@ -62,7 +62,7 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
             token_uri = await contract.methods.tokenURI(id).call()
           } catch (err) {
             if (err && err.message && err.message.includes('nonexistent token')) {
-              console.log('burned')
+              console.log('not exist', collectionAddress, id)
               return
             }
             token_uri = await contract.methods.uri(id).call()
