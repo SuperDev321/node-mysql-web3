@@ -566,7 +566,7 @@ const calculateRarity = async (req, res) => {
               return 0
             }
           })
-          dataToUpdate = dataToUpdate.map((item, index) => ({ ...item, rarityRank : item.rarityRank ? index + 1 : 0}))
+          dataToUpdate = dataToUpdate.map((item, index) => ({ ...item, rarityRank : item.rarityScore > 0 ? index + 1 : 0}))
           
           NFT.updateRarity(dataToUpdate)
         }
