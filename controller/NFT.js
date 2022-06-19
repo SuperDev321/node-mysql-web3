@@ -1,5 +1,9 @@
 const Web3 = require('web3')
 const fetch = require('node-fetch')
+const AbortController = require("abort-controller")
+
+
+
 const { collectionABI, NFTContractABI, ERC1155ABI } = require('../constant/abi')
 const NFT = require('../model/nft.model')
 const {
@@ -39,7 +43,11 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
     for (let id = startId; id <= totalSupply; id ++) {
       const promise = (async () => {
         try {
-          const burned = await contract.methods.ownerOf(id).call()
+          
+          let token_uri = ''
+          const _tokenId = await contract.methods.tokenByIndex(id).call().catch(() => id)
+
+          const burned = await contract.methods.ownerOf(_tokenId).call()
             .then((result) => {
               if (result) {
                 if (isBurned(result)) return true
@@ -50,20 +58,18 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
               return false
             })
           if (burned) {
-            console.log('burned', collectionAddress, id)
             deleteArray.push({
               collectionAddress,
-              tokenId: id
+              tokenId: _tokenId
             })
             return
           }
-          let token_uri = ''
-          const _tokenId = await contract.methods.tokenByIndex(id).call().catch(() => id)
+
           try {
             token_uri = await contract.methods.tokenURI(_tokenId).call()
           } catch (err) {
             if (err && err.message && err.message.includes('nonexistent token')) {
-              console.log('not exist', collectionAddress, id)
+              console.log('not exist', collectionAddress, _tokenId)
               return
             }
             token_uri = await contract.methods.uri(_tokenId).call()
@@ -78,11 +84,13 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
           let p = uri.indexOf('?')
           if (p !== -1) {
             const subStr = uri.slice(p, uri.length)
-            if (!subStr.includes('?index='))
+            if (!subStr.includes('?index=') && !subStr.includes('?filename=') && !subStr.includes('?tokenId=')){
               uri = uri.slice(0, p)
+            }
+              
           }
           if (ipfsUri && ipfsSufix === 'json') {
-            tokenURI = ipfsUri + '/' + id + '.json'
+            tokenURI = ipfsUri + '/' + _tokenId + '.json'
           } else if (!isIpfs(uri) || isBase64(uri)) {
             tokenURI = uri
           } else if (ipfsSufix === 'url') {
@@ -105,7 +113,7 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
                 if (!firstCharacter.match(/[a-z]/i)) subUri = subUri.substring(1)
                 else break
               }
-              tokenURI = getTokenURI(id, '', ipfsSufix, involveId, subUri);
+              tokenURI = getTokenURI(_tokenId, '', ipfsSufix, involveId, subUri);
             } else {
               tokenURI = uri
             }
@@ -120,8 +128,9 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
               if (!firstCharacter.match(/[a-z]/i)) subUri = subUri.substring(1)
               else break
             }
-            tokenURI = getTokenURI(id, '', ipfsSufix, involveId, subUri);
+            tokenURI = getTokenURI(_tokenId, '', ipfsSufix, involveId, subUri );
           }
+          
           const tokenAssetType = await getAssetType(tokenURI)
 
           if (tokenAssetType === 'base64') {
@@ -131,55 +140,78 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
             metadata = JSON.parse(text)
           } else if (tokenAssetType === 'other') {
             try {
-              let response = await fetch(tokenURI);
+              const controller = new AbortController();
+              const timeout = setTimeout(
+                () => { controller.abort(); },
+                5000,
+              );
+              let response = await fetch(tokenURI, {
+                signal: controller.signal
+              })
+              .finally(() => {
+                clearTimeout(timeout);
+              });
               const responseText = await response.text()
               const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
               const correct = responseText.replace(regex, '');
-              metadata = JSON.parse(correct)
-            } catch (err) {
-              await sleep(100)
-              try {
-                let response = await fetch(tokenURI);
-                const responseText = await response.text()
-                const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
-                const correct = responseText.replace(regex, '');
+              if (correct) {
                 metadata = JSON.parse(correct)
-              } catch (err) {
-                console.log(err)
-                return null
+              } else {
+              }
+            } catch (err) {
+              const controller = new AbortController();
+              const timeout = setTimeout(
+                () => { controller.abort(); },
+                5000,
+              );
+              let response = await fetch(tokenURI, {
+                signal: controller.signal
+              })
+              .finally(() => {
+                clearTimeout(timeout);
+              });
+              const responseText = await response.text()
+              const regex = /\,(?!\s*?[\{\[\"\'\w])/g;
+              const correct = responseText.replace(regex, '');
+              if (correct) {
+                metadata = JSON.parse(correct)
               }
             }
           } else {
             isImage = true
           }
-
           let assetURI = ''
           let assetType = ''
-          let title = ''
-          let description = ''
+          let title = null
+          let description = null
           let jsonAttributes = null
 
+          if (metadata) {
+            title = metadata.name ? metadata.name : null
+            let attributes = metadata.attributes ? metadata.attributes : null
+      
+            jsonAttributes = attributes && JSON.stringify(attributes)
+            description = metadata.description ? metadata.description : null
+          } else {
+            console.log('no metadata', tokenURI)
+          }
+
+          if (title) title = title.replace(/\'/g, "\\'")
+          else title = ''
+          if (description) description = description.replace(/\'/g, "\\'")
+          else description = ''
+          if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
+
+          
           if (replacement && replacementPrefix) {
-            assetURI = '/img/replacements/' + replacementPrefix + id + replacementSubfix;
+            assetURI = '/img/replacements/' + replacementPrefix + _tokenId + replacementSubfix;
             assetType = await getAssetType(assetURI)
-            console.log('ok', assetURI, assetType)
           } else {
             if (isImage) {
               assetURI = getImageURI(tokenURI)
               assetType = await getAssetType(assetURI)
               title = collectionName + ' ' ("00" + id).slice(-3);
             } else if (metadata) {
-              title = metadata.name ? metadata.name : null
-              description = metadata.description ? metadata.description : null
-              let attributes = metadata.attributes ? metadata.attributes : null
-    
-              jsonAttributes = attributes && JSON.stringify(attributes)
-    
-              if (title) title = title.replace(/\'/g, "\\'")
-              else title = ''
-              if (description) description = description.replace(/\'/g, "\\'")
-              else description = ''
-              if (jsonAttributes) jsonAttributes = jsonAttributes.replace(/\'/g, "\\'")
               if (metadata.image) {
                 assetURI = getImageURI(metadata.image)
                 assetType = await getAssetType(assetURI)
@@ -193,7 +225,7 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
             }
           }
           createArray.push({collectionAddress,
-            tokenId: id, 
+            tokenId: _tokenId, 
             assetURI,
             assetType,
             title,
@@ -218,7 +250,33 @@ const fetchNFTData = async (_collectionAddress, startId = 0, endId = 0, collecti
     return deleteArray.length + createArray.length
     
   } catch (err) {
+    console.log(err)
     return null
+  }
+}
+
+const removeNFTData = async (req, res) => {
+  try {
+    const { collectionAddress: _collectionAddress, startId, endId } = req.body
+    if (startId > endId) {
+      return res.status(400).json({ error: 'bad input'})
+    }
+    const collectionAddress = _collectionAddress.toLowerCase()
+    console.log(_collectionAddress, startId, endId)
+    const deleteArray = []
+    for (let id = startId; id <= endId; id ++) {
+      deleteArray.push({
+        collectionAddress,
+        tokenId: id
+      })
+    }
+    console.log(deleteArray)
+    if (deleteArray.length) {
+      await NFT.deleteMany(deleteArray)
+    }
+    res.status(200).json({ result: true })
+  } catch (err) {
+    return res.status(500).json({ error: err})
   }
 }
 
@@ -514,7 +572,7 @@ const getNumOfNFTs = async (req, res) => {
       res.status(400).json({})
     }
   } catch (err) {
-    console.log(error)
+    console.log(err)
     res.status(500).json({})
   }
 }
@@ -612,6 +670,34 @@ const calculateRarity = async (req, res) => {
 }
 
 
+const setRarity = async (req, res) => {
+  try {
+    const { collectionAddress: _collectionAddress, idOrderArr } = req.body
+    const collectionAddress = _collectionAddress.toLowerCase()
+    console.log(collectionAddress, idOrderArr)
+    if (idOrderArr && Array.isArray(idOrderArr)) {
+      const updateArray = idOrderArr.map((tokenId, index) => ({
+        collectionAddress,
+        tokenId,
+        rarityRank: index + 1
+      }))
+      await NFT.updateRarityRank(updateArray)
+      res.status(200)
+        .json({})
+    } else {
+      res.status(400)
+        .json({error: 'bad request'})
+    }
+  } catch (err) {
+    console.log(err)
+    res.status(500)
+      .json({
+        error: 'Server error'
+      })
+  }
+}
+
+
 module.exports = {
   fetchDefaultNFTData,
   fetchNFTData,
@@ -620,5 +706,7 @@ module.exports = {
   getOneNFT,
   getMarketplaceNFTs,
   getNumOfNFTs,
-  calculateRarity
+  calculateRarity,
+  removeNFTData,
+  setRarity
 }

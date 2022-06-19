@@ -1,5 +1,5 @@
 const express = require('express');
-const { fetchNFTData, getNFT, getMarketplaceNFTs, fetchDefaultNFTData, getOneNFT, getNumOfNFTs, calculateRarity } = require('./controller/NFT');
+const { fetchNFTData, getNFT, getMarketplaceNFTs, fetchDefaultNFTData, getOneNFT, getNumOfNFTs, calculateRarity, setRarity, removeNFTData } = require('./controller/NFT');
 const router = express.Router();
 
 router.post('/fetchFromBC', async function (req, res) {
@@ -23,9 +23,13 @@ router.get('/:collectionAddress/count', getNumOfNFTs);
 
 router.get('/:collectionAddress/:tokenId', getOneNFT);
 
+router.post('/set/rarity', setRarity);
+
 router.post('/getItems', getMarketplaceNFTs);
 
 router.post('/calculateRarity', calculateRarity);
+
+router.post('/remove', removeNFTData);
 
 //export this router to use in our index.js
 module.exports = router;

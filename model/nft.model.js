@@ -109,6 +109,36 @@ NFT.deleteMany = (newNfts) => {
   })
 };
 
+NFT.updateRarityRank = (newNfts) => {
+  return new Promise((resolve, reject) => {
+    
+    let query = 'UPDATE nfts s JOIN ('
+    newNfts.forEach((_element, index) => {
+      const {
+        tokenId,
+        collectionAddress,
+        rarityRank
+      } = _element
+      if (index === 0) {
+        query += `SELECT '${tokenId}' as tokenId, '${rarityRank}' as rarityRank1, '${collectionAddress}' as collectionAddress UNION ALL `
+      } else if (index < newNfts.length - 1) {
+        query += `SELECT '${tokenId}', '${rarityRank}', '${collectionAddress}' UNION ALL `
+      } else {
+        query += `SELECT '${tokenId}', '${rarityRank}', '${collectionAddress}' `
+      }
+    });
+    query += ') vals ON s.tokenId = vals.tokenId AND s.collectionAddress = vals.collectionAddress SET rarityRank = rarityRank1;'
+    sql.query(query, (err, res) => {
+      if (err) {
+        console.log("error: ", err);
+        reject(err);
+        return;
+      }
+      resolve(true)
+    });
+  })
+};
+
 NFT.updateRarity = (newNfts) => {
   return new Promise((resolve, reject) => {
     

@@ -24,7 +24,8 @@ const isBurned = (address) => {
 function isBase64(str) {
   if (str ==='' || str.trim() ===''){ return false; }
   try {
-      return Buffer.from(str, 'base64').toString('base64') === str
+    let buff = new Buffer(data);
+      return btoa(atob(str)) === str;
   } catch (err) {
       return false;
   }
@@ -70,36 +71,30 @@ const getIPFSSufix = (uri) => {
 
 const getTokenURI = (id, ipfsPrefix, ipfsSufix, involveId, locationQm) => {
   if(involveId) {
-    if (locationQm.includes('/')) {
-      if (ipfsPrefix && ipfsPrefix.includes('Qm')) {
-        let arr = locationQm.split('/')
-        if (arr && arr.length > 1) {
-          let name = arr[1]
-          if (ipfsPrefix[ipfsPrefix.length - 1] === '/') {
-            return ipfsPrefix + name;
-          } else {
-            return ipfsPrefix + '/' + name;
-          }
+    if (ipfsPrefix && ipfsPrefix.includes('Qm')) {
+      let arr = locationQm.split('/')
+      if (arr && arr.length > 1) {
+        let name = arr[1]
+        if (ipfsPrefix[ipfsPrefix.length - 1] === '/') {
+          return ipfsPrefix + name;
         } else {
-          return "https://operahouse.mypinata.cloud/ipfs/" + locationQm;
-        }
-      } else if (!ipfsPrefix || ipfsPrefix === '') {
-        if (locationQm && locationQm.length > 0 && locationQm[0] === '/') {
-          return "https://operahouse.mypinata.cloud/ipfs" + locationQm;
-        } else {
-          return "https://operahouse.mypinata.cloud/ipfs/" + locationQm;
+          return ipfsPrefix + '/' + name;
         }
       } else {
-        if ((locationQm && locationQm.length > 0 && locationQm[0] === '/') || (ipfsPrefix && ipfsPrefix.length > 0 && ipfsPrefix[ipfsPrefix.length - 1] === '/')) {
-          return ipfsPrefix + locationQm;
-        } else {
-          return ipfsPrefix + '/' + locationQm;
-        }
+        return "https://operahouse.mypinata.cloud/ipfs/" + locationQm;
+      }
+    } else if (!ipfsPrefix || ipfsPrefix === '') {
+      if (locationQm && locationQm.length > 0 && locationQm[0] === '/') {
+        return "https://operahouse.mypinata.cloud/ipfs" + locationQm;
+      } else {
+        return "https://operahouse.mypinata.cloud/ipfs/" + locationQm;
       }
     } else {
-      if (ipfsSufix !== 'url')
-        return ipfsPrefix + id + ipfsSufix;
-      else return ipfsPrefix + id
+      if ((locationQm && locationQm.length > 0 && locationQm[0] === '/') || (ipfsPrefix && ipfsPrefix.length > 0 && ipfsPrefix[ipfsPrefix.length - 1] === '/')) {
+        return ipfsPrefix + locationQm;
+      } else {
+        return ipfsPrefix + '/' + locationQm;
+      }
     }
   } else{
     if (locationQm && locationQm.length > 0 && locationQm[0] === '/') {
@@ -109,7 +104,6 @@ const getTokenURI = (id, ipfsPrefix, ipfsSufix, involveId, locationQm) => {
     }
   }
 }
-
 const getAssetType = (url) => {
   if (url) {
     if (isBase64URI(url)) return 'base64'
@@ -131,15 +125,28 @@ const getAssetType = (url) => {
     if(uri.indexOf(".gif") !== -1) return "image";
     if(uri.indexOf(".glb") !== -1) return "glb";
     return new Promise((resolve, reject) => {
+      console.log('here', url)
       var xhr = new XMLHttpRequest();
       xhr.open('HEAD', url, true);
+      const timeout = setTimeout(() => {
+        clearTimeout(timeout)
+        xhr.abort()
+        resolve('other')
+      }, 2000)
       xhr.onload = function() {
+        clearTimeout(timeout)
         var contentType = xhr.getResponseHeader('Content-Type');
         if (contentType.match('video.*')) resolve('video')
         else if (contentType.match('image.*')) resolve('image')
         else resolve('other')
       };
       xhr.onerror = function(err) {
+        clearTimeout(timeout)
+        resolve('other')
+      }
+      xhr.ontimeout = function(err) {
+        clearTimeout(timeout)
+        console.log('timeout')
         resolve('other')
       }
       xhr.send();
@@ -150,18 +157,18 @@ const getAssetType = (url) => {
 }
 
 const countTraitValue = (nfts, traitType, traitValue) => {
-  console.log('count trait', traitType, traitValue)
   try {
     const traitCount = nfts.filter((nft) => {
-      const { attributes } = nft
+      const attributes = nft.attributes
       if (!attributes) return false
       let jsonAttributes = attributes
       if (typeof attributes !== 'object') jsonAttributes = JSON.parse(attributes)
-      return jsonAttributes.find(({ trait_type, value }) => (value === traitValue && trait_type === traitType))
+      if (jsonAttributes)
+        return jsonAttributes.find(({ trait_type, value }) => (value === traitValue && trait_type === traitType))
+      return false
     }).length
     return traitCount
   } catch (err) {
-    console.log(err)
     return 0
   }
 }
